@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text.Json;
 
 namespace ParagonCodingExercise.Airports
@@ -33,6 +30,7 @@ namespace ParagonCodingExercise.Airports
             });
         }
 
+        // The number of airports in this collection
         public int Count
         {
             get
@@ -57,6 +55,8 @@ namespace ParagonCodingExercise.Airports
             }
         }
 
+        // Returns the airport that's closest to the given coordinate, or null if the coordinate
+        // is invalid or if no airports are within 3 degrees of latitude or longitude
         public Airport GetClosestAirport(GeoCoordinate coordinate)
         {
             if (!coordinate.HasLocation())
@@ -67,13 +67,14 @@ namespace ParagonCodingExercise.Airports
             var closestDistance = double.MaxValue;
             Airport closestAirport = null;
 
+            // Check within 3 degrees of latitude and longitude for the nearest airport
             for (var x = -1; x <= 1; x++)
             {
                 for (var y = -1; y <= 1; y++)
                 {
-                    var square = new GeoCoordinate((int)coordinate.Latitude + x, (int)coordinate.Longitude + y);
+                    var check = new GeoCoordinate((int)coordinate.Latitude + x, (int)coordinate.Longitude + y);
 
-                    AirportMap.GetValueOrDefault(square)?.ForEach(airport =>
+                    AirportMap.GetValueOrDefault(check)?.ForEach(airport =>
                     {
                         var distance = coordinate.GetDistanceTo(airport.GeoCoordinate);
 

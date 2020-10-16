@@ -46,14 +46,6 @@ namespace ParagonCodingExercise
             return File.ReadLines(filePath).Select(line => AdsbEvent.FromJson(line)).ToList();
         }
 
-        private static void WriteResults(List<Flight> flights)
-        {
-            using (StreamWriter file = new StreamWriter(OutputFilePath))
-            {
-                flights.ForEach(flight => file.WriteLine(JsonSerializer.Serialize(flight)));
-            }
-        }
-
         // Guesses whether the enumerable has an increasing or decreasing trend
         private static Trend GuessTrend(IEnumerable<double> enumerable)
         {
@@ -65,6 +57,7 @@ namespace ParagonCodingExercise
 
         private static void Execute()
         {
+            // Process data files
             var airports = AirportCollection.LoadFromFile(AirportsFilePath);
             var adsbEvents = LoadFromFile(AdsbEventsFilePath);
             Console.WriteLine($"Loaded {airports.Count} airports and {adsbEvents.Count} events");
@@ -102,49 +95,57 @@ namespace ParagonCodingExercise
                     .Where(adsbEvent => adsbEvent.Latitude != null && adsbEvent.Longitude != null)
                     .OrderBy(adsbEvent => adsbEvent.Timestamp);
 
-                // Implement a sliding window
-                var filteredEvents = aircraftEvents.Where(adsbEvent => adsbEvent.Altitude != null);
-                var windowSize = 10;
+                // Implement a sliding window by analyzing the altitude data
+                // This could also be implemented by analyzing the speed data, but the altitude data is
+                // more consistent
+                var events = aircraftEvents.Where(adsbEvent => adsbEvent.Altitude != null);
+                var step = 10;
                 var sampleSize = 25;
                 var previousTrend = Trend.Unknown;
 
                 // Check the start events for departure
-                var startWindow = filteredEvents.Take(sampleSize);
-                if (startWindow.First().Altitude < startWindow.Last().Altitude)
+                var startSample = events.Take(sampleSize);
+                if (startSample.First().Altitude < startSample.Last().Altitude)
                 {
-                    flight.DepartureTime = filteredEvents.First().Timestamp;
-                    flight.DepartureAirport = airports.GetClosestAirport(filteredEvents.First().GeoCoordinate).Identifier;
+                    flight.DepartureTime = events.First().Timestamp;
+                    flight.DepartureAirport = airports.GetClosestAirport(events.First().GeoCoordinate).Identifier;
                 }
 
                 // Check the middle events for additional flights
-                for (var i = 0; i < filteredEvents.Count() - sampleSize; i += windowSize)
+                for (var i = 0; i < events.Count() - sampleSize; i += step)
                 {
-                    var window = filteredEvents.Skip(i).Take(sampleSize);
-                    var currentTrend = GuessTrend(window.Select(adsbEvent => adsbEvent.Altitude.Value));
+                    var sample = events.Skip(i).Take(sampleSize);
+                    var currentTrend = GuessTrend(sample.Select(adsbEvent => adsbEvent.Altitude.Value));
 
                     // If the aircraft's altitude trend changes from decreasing to increasing below the altitude threshold,
                     // assume that it's started a new flight
                     if (previousTrend == Trend.Decrease
                         && currentTrend == Trend.Increase
-                        && window.Last().Altitude < MAX_ALTITUDE)
+                        && sample.First().Altitude < MAX_ALTITUDE)
                     {
-                        var airport = airports.GetClosestAirport(window.Last().GeoCoordinate);
+                        var airport = airports.GetClosestAirport(sample.First().GeoCoordinate);
 
-                        // Check if the aircraft is flying over the airport
-                        if (Math.Abs(airport.Elevation - window.Last().Altitude.Value) >= GROUND_TOLERANCE)
+                        // If there isn't an airport nearby, the airplane may have made an unexpected descent and ascent
+                        if (airport == null)
                         {
                             continue;
                         }
 
-                        flight.ArrivalTime = window.Last().Timestamp;
+                        // Check if the aircraft is flying over the airport
+                        if (Math.Abs(airport.Elevation - sample.First().Altitude.Value) >= GROUND_TOLERANCE)
+                        {
+                            continue;
+                        }
+
+                        flight.ArrivalTime = sample.First().Timestamp;
                         flight.ArrivalAirport = airport.Identifier;
                         flights.Add(flight);
 
                         flight = new Flight
                         {
                             AircraftIdentifier = aircraft.AircraftIdentifier,
-                            DepartureTime = window.First().Timestamp,
-                            DepartureAirport = airports.GetClosestAirport(window.First().GeoCoordinate).Identifier
+                            DepartureTime = sample.Last().Timestamp,
+                            DepartureAirport = airports.GetClosestAirport(sample.Last().GeoCoordinate).Identifier
                         };
                     }
 
@@ -152,12 +153,12 @@ namespace ParagonCodingExercise
                 }
 
                 // Check the end events for arrival
-                var endWindow = filteredEvents.TakeLast(sampleSize);
+                var endSample = events.TakeLast(sampleSize);
 
-                if (endWindow.First().Altitude > endWindow.Last().Altitude)
+                if (endSample.First().Altitude > endSample.Last().Altitude)
                 {
-                    flight.ArrivalTime = filteredEvents.Last().Timestamp;
-                    flight.ArrivalAirport = airports.GetClosestAirport(filteredEvents.Last().GeoCoordinate).Identifier;
+                    flight.ArrivalTime = events.Last().Timestamp;
+                    flight.ArrivalAirport = airports.GetClosestAirport(events.Last().GeoCoordinate).Identifier;
                 }
 
                 if (flight.DepartureAirport != null || flight.ArrivalAirport != null)
@@ -169,5 +170,13 @@ namespace ParagonCodingExercise
             Console.WriteLine($"Identified {flights.Count} potential flights");
             WriteResults(flights);
         }
+        private static void WriteResults(List<Flight> flights)
+        {
+            using (StreamWriter file = new StreamWriter(OutputFilePath))
+            {
+                flights.ForEach(flight => file.WriteLine(JsonSerializer.Serialize(flight)));
+            }
+        }
+
     }
 }
