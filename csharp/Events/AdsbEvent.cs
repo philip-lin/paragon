@@ -20,6 +20,14 @@ namespace ParagonCodingExercise.Events
 
         public DateTime Timestamp { get; set; }
 
+        public GeoCoordinate GeoCoordinate
+        {
+            get
+            {
+                return new GeoCoordinate(Latitude ?? double.NaN, Longitude ?? double.NaN);
+            }
+        }
+
         public static AdsbEvent FromJson(string json)
         {
             var root = JsonDocument.Parse(json).RootElement;
@@ -34,6 +42,11 @@ namespace ParagonCodingExercise.Events
                 Heading = root.GetPropertyAsNullableDouble("heading"),
                 Speed = root.GetPropertyAsNullableDouble("speed"),
             };
+        }
+
+        public override string ToString()
+        {
+            return $"{Timestamp} {Identifier} ({Latitude}, {Longitude})";
         }
     }
 }

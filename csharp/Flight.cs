@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ParagonCodingExercise.Events;
+using System;
+using System.Collections.Generic;
 
 namespace ParagonCodingExercise
 {

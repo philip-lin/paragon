@@ -39,7 +39,6 @@ namespace ParagonCodingExercise
             Longitude = longitude;
         }
 
-
         /// <summary>
         /// Determines whether this instance represents a valid location
         /// </summary>
